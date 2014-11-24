@@ -1,0 +1,40 @@
+{
+  "name": "client-server-base-project",
+  "version": "0.0.1",
+  "homepage": "https://github.com/edersohe/client-server-base-project",
+  "authors": [
+    "Eder Sosa <eder.sohe@gmail.com>"
+  ],
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "libraries",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.1",
+    "underscore": "~1.7.0",
+    "backbone": "~1.1.2",
+    "uikit": "~2.12.0",
+    "backbone.wreqr": "~1.3.1",
+    "backbone.babysitter": "~0.1.5",
+    "backbone.marionette": "~2.2.2",
+    "backbone.localStorage": "~1.1.14",
+    "backbone-validation": "~0.9.1",
+    "string": "~2.2.0",
+    "moment": "~2.8.4",
+    "chartjs": "v1.0.1-beta.4",
+    "hammerjs": "~2.0.4",
+    "jquery-hammerjs": "~2.0.0",
+    "backbone.hammer": "~1.0.1",
+    "domReady": "~2.0.1",
+    "text": "~2.0.12",
+    "requirejs-i18n": "~2.0.4",
+    "requirejs": "~2.1.15"
+  },
+  "devDependencies": {}
+}
