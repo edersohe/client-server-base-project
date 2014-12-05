@@ -68,25 +68,20 @@ class APIApp(Flask):
         for code in default_exceptions.iterkeys():
             self.error_handler_spec[None][code] = self.make_json_error
 
-    def route(self, rule, **options):
-        def decorator(f):
-            def wrap(*args, **kwargs):
-                response = f(*args, **kwargs)
-                if isinstance(response, (Response, APIResponse)):
-                    return response
-                elif isinstance(response, tuple):
-                    return APIResponse(response=response[0], status=response[1] if len(response) > 1 else None,
-                                       headers=response[2] if len(response) > 2 else None)
-                elif hasattr(response, '__call__'):
-                    return response
-                else:
-                    return APIResponse(response)
+    def add_url_rule(self, rule, endpoint=None, view_func=None, **options):
+        def wrap(*args, **kwargs):
+            response = view_func(*args, **kwargs)
+            if isinstance(response, (Response, APIResponse)):
+                return response
+            elif isinstance(response, tuple):
+                return APIResponse(response=response[0], status=response[1] if len(response) > 1 else None,
+                                   headers=response[2] if len(response) > 2 else None)
+            elif hasattr(response, '__call__'):
+                return response
+            else:
+                return APIResponse(response)
 
-            endpoint = options.pop('endpoint', None)
-            self.add_url_rule(rule, endpoint, wrap, **options)
-            return wrap
-
-        return decorator
+        super(APIApp, self).add_url_rule(rule, endpoint, wrap, **options)
 
     @staticmethod
     def make_json_error(ex):
@@ -104,10 +99,10 @@ app = APIApp(__name__)
 def index():
     app.logger.debug('Esto es una prueba')
     # 1 / 0
-    #return 'eder'
+    # return 'eder'
     #return ['google', 1, 2]
     #return ('Hello world', 500)
-    return (None, 404)
+    #return (None, 404)
     return app.send_static_file('templates/index.html')
 
 
