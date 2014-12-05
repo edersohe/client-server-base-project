@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from pymongo import MongoClient
-from flask import Flask, jsonify, request
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
+import logging
+
+from pymongo import MongoClient
+from flask import Flask, json, jsonify
+from flask.wrappers import Response
 from werkzeug.exceptions import default_exceptions
 from werkzeug.exceptions import HTTPException
 
-import logging
-
 
 class LoggingFilter(object):
-
     def __init__(self, *args):
         self.__args = args
 
@@ -20,11 +20,27 @@ class LoggingFilter(object):
         return record.levelno in self.__args
 
 
-class API(Flask):
+class APIResponse(Response):
+    default_mimetype = 'application/json'
+
+    def __init__(self, response=None, status=None, headers=None, mimetype='application/json', content_type=None,
+                 direct_passthrough=False, error=None, message=None):
+
+        super(APIResponse, self).__init__(
+            response=json.dumps(dict(*[], response=response, error=error, code=status, message=message)),
+            status=status,
+            headers=headers,
+            mimetype=mimetype,
+            content_type=content_type,
+            direct_passthrough=direct_passthrough)
+
+
+class APIApp(Flask):
     def __init__(self, *args, **kwargs):
-        super(API, self).__init__(*args, **kwargs)
+        super(APIApp, self).__init__(*args, **kwargs)
         self.config.from_object('config')
         self.__db = MongoClient(self.config['MONGODB_URI']).suggestic_base
+        self.response_class = APIResponse
 
         if self.config['ENVIRONMENT'] == 'development':
             handler = StreamHandler()
@@ -59,27 +75,24 @@ class API(Flask):
     @staticmethod
     def make_json_error(ex):
 
-        error = {
-            'code': ex.code if isinstance(ex, HTTPException) else 500,
-            'message': ex.message if isinstance(ex, HTTPException) else "Internal Server Error"
-        }
+        code = ex.code if isinstance(ex, HTTPException) else 500
+        message = ex.message if isinstance(ex, HTTPException) else "Internal Server Error"
 
-        response = jsonify(error=error, response=None)
-        response.status_code = error['code']
-        return response
+        return APIResponse(status=code, error=True, response=None, message=message)
 
     def db(self, collection):
         return self.__db[collection]
 
 
-app = API(__name__)
+app = APIApp(__name__)
+#app = Flask(__name__)
 
 
 @app.route('/', methods=['GET'])
 def index():
     app.logger.debug('Esto es una prueba')
-    a = 1 / 0
-    return jsonify()
+    return ['prueba', 'dsfddf']
+    #return jsonify(response=['prueba', 'dsfddf'])
     # return app.send_static_file('templates/index.html')
 
 
