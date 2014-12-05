@@ -21,10 +21,13 @@ class LoggingFilter(object):
 
 
 class APIResponse(Response):
-    def __init__(self, response=None, status=200, headers=None):
+    default_mimetype = 'application/json'
+
+    def __init__(self, response=None, status=None, headers=None):
+        status = status if status else 200
         super(APIResponse, self).__init__(
             response=json.dumps(dict(response=response, code=status, message=HTTP_STATUS_CODES[status])),
-            mimetype='application/json', status=status, headers=headers)
+            status=status, headers=headers)
 
 
 class APIApp(Flask):
