@@ -83,7 +83,6 @@ class APIApp(Flask):
         for code in default_exceptions.iterkeys():
             self.error_handler_spec[None][code] = self.make_json_error
 
-
     @staticmethod
     def make_json_error(ex):
         code = ex.code if isinstance(ex, HTTPException) else 500
@@ -104,6 +103,27 @@ class APIApp(Flask):
 
         super(APIApp, self).add_url_rule(rule, endpoint, wrap, **options)
 
+    def _route_extend(self, rule, methods=None, **options):
+        def decorator(f):
+            endpoint = options.pop('endpoint', None)
+            options.update({'methods': methods})
+            self.add_url_rule(rule, endpoint, f, **options)
+            return f
+
+        return decorator
+
+    def get(self, rule):
+        return self._route_extend(rule, methods=['GET'])
+
+    def post(self, rule):
+        return self._route_extend(rule, methods=['POST'])
+
+    def put(self, rule):
+        return self._route_extend(rule, methods=['PUT'])
+
+    def delete(self, rule):
+        return self._route_extend(rule, methods=['DELETE'])
+
     def db(self, collection):
         return self.__db[collection]
 
@@ -111,7 +131,7 @@ class APIApp(Flask):
 app = APIApp(__name__)
 
 
-@app.route('/', methods=['GET'])
+@app.get('/')
 def index():
     logging.info('Esto es una prueba')
     1 / 0
