@@ -20,6 +20,50 @@ class LoggingFilter(object):
         return record.levelno in self.__args
 
 
+def logging_setup(environment):
+    default_log_format = '%(levelname)s: %(message)s'
+    development_log_format = '%(levelname)s in %(filename)s:%(lineno)d\n%(message)s\n' + ('-' * 80)
+    production_error_log_format = '%(asctime)s %(levelname)s: %(message)s'
+    production_message_log_format = '%(asctime)s %(levelname)s: %(message)s [in %(filename)s:%(lineno)d]'
+
+    if environment == 'development':
+        handler = StreamHandler()
+        handler.setLevel(logging.DEBUG)
+        handler.setFormatter(Formatter(development_log_format))
+        log = logging.getLogger()
+        log.addHandler(handler)
+        log.setLevel(logging.DEBUG)
+
+    elif environment == 'testing':
+        handler = StreamHandler()
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(Formatter(default_log_format))
+        log = logging.getLogger()
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
+
+    elif environment == 'production':
+        handler = RotatingFileHandler('log/error.log', maxBytes=10000, backupCount=1)
+        handler.setLevel(logging.ERROR)
+        handler.setFormatter(Formatter(production_error_log_format))
+        log = logging.getLogger()
+        log.addHandler(handler)
+        log.setLevel(logging.ERROR)
+
+        handler = RotatingFileHandler('log/access.log', maxBytes=10000, backupCount=1)
+        log = logging.getLogger('werkzeug')
+        log.addHandler(handler)
+        log.propagate = False
+
+        handler = RotatingFileHandler('log/messages.log', maxBytes=10000, backupCount=1)
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(Formatter(production_message_log_format))
+        handler.addFilter(LoggingFilter(logging.INFO, logging.WARNING))
+        log = logging.getLogger()
+        log.addHandler(handler)
+        log.setLevel(logging.INFO)
+
+
 class APIResponse(Response):
     default_mimetype = 'application/json'
 
@@ -34,39 +78,16 @@ class APIApp(Flask):
     def __init__(self, *args, **kwargs):
         super(APIApp, self).__init__(*args, **kwargs)
         self.config.from_object('config')
+        logging_setup(self.config.get('ENVIRONMENT', 'production'))
         self.__db = MongoClient(self.config['MONGODB_URI']).suggestic_base
-        self.default_log_format = '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-
-        if self.config['ENVIRONMENT'] == 'development':
-            handler = StreamHandler()
-            handler.setLevel(logging.DEBUG)
-            handler.setFormatter(Formatter(self.debug_log_format))
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.DEBUG)
-
-        elif self.config['ENVIRONMENT'] == 'testing':
-            handler = StreamHandler()
-            handler.setLevel(logging.INFO)
-            handler.setFormatter(Formatter(self.default_log_format))
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.INFO)
-
-        else:
-            handler = RotatingFileHandler('log/error.log', maxBytes=10000, backupCount=1)
-            handler.setLevel(logging.ERROR)
-            handler.setFormatter(Formatter(self.default_log_format))
-            self.logger.addHandler(handler)
-
-            handler = RotatingFileHandler('log/access.log', maxBytes=10000, backupCount=1)
-            handler.setLevel(logging.INFO)
-            handler.setFormatter(Formatter(self.default_log_format))
-            handler.addFilter(LoggingFilter(logging.INFO, logging.WARNING))
-            self.logger.addHandler(handler)
-
-            self.logger.setLevel(logging.INFO)
-
         for code in default_exceptions.iterkeys():
             self.error_handler_spec[None][code] = self.make_json_error
+
+
+    @staticmethod
+    def make_json_error(ex):
+        code = ex.code if isinstance(ex, HTTPException) else 500
+        return APIResponse(status=code)
 
     def add_url_rule(self, rule, endpoint=None, view_func=None, **options):
         def wrap(*args, **kwargs):
@@ -83,11 +104,6 @@ class APIApp(Flask):
 
         super(APIApp, self).add_url_rule(rule, endpoint, wrap, **options)
 
-    @staticmethod
-    def make_json_error(ex):
-        code = ex.code if isinstance(ex, HTTPException) else 500
-        return APIResponse(status=code)
-
     def db(self, collection):
         return self.__db[collection]
 
@@ -97,12 +113,12 @@ app = APIApp(__name__)
 
 @app.route('/', methods=['GET'])
 def index():
-    app.logger.debug('Esto es una prueba')
-    # 1 / 0
-    # return 'eder'
-    #return ['google', 1, 2]
-    #return ('Hello world', 500)
-    #return (None, 404)
+    logging.info('Esto es una prueba')
+    1 / 0
+    return 'eder'
+    return ['google', 1, 2]
+    return ('Hello world', 500)
+    return (None, 404)
     return app.send_static_file('templates/index.html')
 
 
