@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 import logging
 
 from pymongo import MongoClient
-from flask import Flask, json, Response
+from flask import Flask, json, Response, Blueprint
 from werkzeug.exceptions import default_exceptions
 from werkzeug.exceptions import HTTPException
 from werkzeug.http import HTTP_STATUS_CODES
@@ -77,9 +77,6 @@ class APIResponse(Response):
 class APIApp(Flask):
     def __init__(self, *args, **kwargs):
         super(APIApp, self).__init__(*args, **kwargs)
-        self.config.from_object('config')
-        logging_setup(self.config.get('ENVIRONMENT', 'production'))
-        self.__db = MongoClient(self.config['MONGODB_URI']).suggestic_base
         for code in default_exceptions.iterkeys():
             self.error_handler_spec[None][code] = self.make_json_error
 
@@ -103,32 +100,42 @@ class APIApp(Flask):
 
         super(APIApp, self).add_url_rule(rule, endpoint, wrap, **options)
 
-    def _route_extend(self, rule, methods=None, **options):
-        def decorator(f):
-            endpoint = options.pop('endpoint', None)
-            options.update({'methods': methods})
-            self.add_url_rule(rule, endpoint, f, **options)
-            return f
-
-        return decorator
-
     def get(self, rule):
-        return self._route_extend(rule, methods=['GET'])
+        return self.route(rule, methods=['GET'])
 
     def post(self, rule):
-        return self._route_extend(rule, methods=['POST'])
+        return self.route(rule, methods=['POST'])
 
     def put(self, rule):
-        return self._route_extend(rule, methods=['PUT'])
+        return self.route(rule, methods=['PUT'])
 
     def delete(self, rule):
-        return self._route_extend(rule, methods=['DELETE'])
+        return self.route(rule, methods=['DELETE'])
 
-    def db(self, collection):
-        return self.__db[collection]
+
+class APIBlueprint(Blueprint):
+    def get(self, rule):
+        return self.route(rule, methods=['GET'])
+
+    def post(self, rule):
+        return self.route(rule, methods=['POST'])
+
+    def put(self, rule):
+        return self.route(rule, methods=['PUT'])
+
+    def delete(self, rule):
+        return self.route(rule, methods=['DELETE'])
 
 
 app = APIApp(__name__)
+app.config.from_object('config')
+logging_setup(app.config.get('ENVIRONMENT', 'production'))
+logging.info('loading var from config object:\n%s', dict(app.config))
+app.db = lambda collection: MongoClient(app.config['MONGODB_URI']).suggestic_base[collection]
+
+from blueprints.user import bp as user
+
+app.register_blueprint(user, url_prefix='/' + 'user')
 
 
 @app.get('/')
@@ -139,6 +146,7 @@ def index():
     return ['google', 1, 2]
     return ('Hello world', 500)
     return (None, 404)
+    print app.db('menu_items_flattened_all_ingredients')
     return app.send_static_file('templates/index.html')
 
 
