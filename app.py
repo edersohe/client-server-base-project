@@ -4,7 +4,8 @@
 import logging
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
-from flask import Flask, json, Response, Blueprint
+from flask import (Flask, json, Response as OriginalResponse,
+                   Blueprint as OriginalBluePrint)
 from werkzeug.exceptions import default_exceptions, HTTPException
 from werkzeug.http import HTTP_STATUS_CODES
 
@@ -64,7 +65,7 @@ def logging_setup(environment, maxbytes=100000):
         log.setLevel(logging.INFO)
 
 
-class APIResponse(Response):
+class Response(OriginalResponse):
     default_mimetype = 'application/json'
 
     def __init__(self, response=None, status=None, headers=None):
@@ -75,25 +76,25 @@ class APIResponse(Response):
             'status': HTTP_STATUS_CODES[status]
 
         }
-        super(APIResponse, self).__init__(
+        super(Response, self).__init__(
             response=json.dumps(response), status=status, headers=headers)
 
 
-class APIApp(Flask):
+class App(Flask):
     def __init__(self, *args, **kwargs):
-        super(APIApp, self).__init__(*args, **kwargs)
+        super(App, self).__init__(*args, **kwargs)
         for code in default_exceptions.iterkeys():
             self.error_handler_spec[None][code] = self.make_json_error
 
     @staticmethod
     def make_json_error(ex):
         code = ex.code if isinstance(ex, HTTPException) else 500
-        return APIResponse(status=code)
+        return Response(status=code)
 
     def add_url_rule(self, rule, endpoint=None, view_func=None, **options):
         def wrap(*args, **kwargs):
             response = view_func(*args, **kwargs)
-            if isinstance(response, (Response, APIResponse)):
+            if isinstance(response, (Response, Response)):
                 return response
             elif isinstance(response, tuple):
                 response = {
@@ -101,13 +102,13 @@ class APIApp(Flask):
                     'status': response[1] if len(response) > 1 else None,
                     'headers': response[2] if len(response) > 2 else None
                 }
-                return APIResponse(**response)
+                return Response(**response)
             elif hasattr(response, '__call__'):
                 return response
             else:
-                return APIResponse(response)
+                return Response(response)
 
-        super(APIApp, self).add_url_rule(rule, endpoint, wrap, **options)
+        super(App, self).add_url_rule(rule, endpoint, wrap, **options)
 
     def get(self, rule):
         return self.route(rule, methods=['GET'])
@@ -122,7 +123,7 @@ class APIApp(Flask):
         return self.route(rule, methods=['DELETE'])
 
 
-class APIBlueprint(Blueprint):
+class Blueprint(OriginalBluePrint):
     def get(self, rule):
         return self.route(rule, methods=['GET'])
 
@@ -134,3 +135,28 @@ class APIBlueprint(Blueprint):
 
     def delete(self, rule):
         return self.route(rule, methods=['DELETE'])
+
+
+if __name__ == "__main__":
+
+    app = App(__name__)
+    app.config.from_object('config')
+    logging_setup(app.config.get('ENVIRONMENT', 'production'))
+    logging.info('loading var from config object:\n%s', dict(app.config))
+
+    from blueprints.user import bp as user
+
+    app.register_blueprint(user, url_prefix='/' + 'user')
+
+    @app.get('/')
+    def index():
+        logging.info('Esto es una prueba')
+        1 / 0
+        return 'eder'
+        return ['google', 1, 2]
+        return ('Hello world', 500)
+        return (None, 404)
+        print app.db('menu_items_flattened_all_ingredients')
+        return app.send_static_file('templates/index.html')
+
+    app.run(use_reloader=True)
