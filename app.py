@@ -20,11 +20,14 @@ class LoggingFilter(object):
         return record.levelno in self.__args
 
 
-def logging_setup(environment):
+def logging_setup(environment, maxbytes=100000):
+    kwargs_handler = {'maxBytes': maxbytes, 'backupCount': 1}
     default_log_format = '%(levelname)s: %(message)s'
-    development_log_format = '%(levelname)s in %(filename)s:%(lineno)d\n%(message)s\n' + ('-' * 80)
+    development_log_format = '%(levelname)s in %(filename)s:%(lineno)d\n'
+    development_log_format = '%(message)s\n' + ('-' * 80)
     production_error_log_format = '%(asctime)s %(levelname)s: %(message)s'
-    production_message_log_format = '%(asctime)s %(levelname)s: %(message)s [in %(filename)s:%(lineno)d]'
+    production_message_log_format = '%(asctime)s %(levelname)s: %(message)s '
+    production_message_log_format += '[in %(filename)s:%(lineno)d]'
 
     if environment == 'development':
         handler = StreamHandler()
@@ -43,19 +46,19 @@ def logging_setup(environment):
         log.setLevel(logging.INFO)
 
     elif environment == 'production':
-        handler = RotatingFileHandler('log/error.log', maxBytes=10000, backupCount=1)
+        handler = RotatingFileHandler('log/error.log', **kwargs_handler)
         handler.setLevel(logging.ERROR)
         handler.setFormatter(Formatter(production_error_log_format))
         log = logging.getLogger()
         log.addHandler(handler)
         log.setLevel(logging.ERROR)
 
-        handler = RotatingFileHandler('log/access.log', maxBytes=10000, backupCount=1)
+        handler = RotatingFileHandler('log/access.log', **kwargs_handler)
         log = logging.getLogger('werkzeug')
         log.addHandler(handler)
         log.propagate = False
 
-        handler = RotatingFileHandler('log/messages.log', maxBytes=10000, backupCount=1)
+        handler = RotatingFileHandler('log/messages.log', **kwargs_handler)
         handler.setLevel(logging.INFO)
         handler.setFormatter(Formatter(production_message_log_format))
         handler.addFilter(LoggingFilter(logging.INFO, logging.WARNING))
@@ -69,9 +72,14 @@ class APIResponse(Response):
 
     def __init__(self, response=None, status=None, headers=None):
         status = status if status else 200
+        response = {
+            'response': response,
+            'code': status,
+            'status': HTTP_STATUS_CODES[status]
+
+        }
         super(APIResponse, self).__init__(
-            response=json.dumps(dict(response=response, code=status, message=HTTP_STATUS_CODES[status])),
-            status=status, headers=headers)
+            response=json.dumps(response), status=status, headers=headers)
 
 
 class APIApp(Flask):
@@ -91,8 +99,12 @@ class APIApp(Flask):
             if isinstance(response, (Response, APIResponse)):
                 return response
             elif isinstance(response, tuple):
-                return APIResponse(response=response[0], status=response[1] if len(response) > 1 else None,
-                                   headers=response[2] if len(response) > 2 else None)
+                response = {
+                    'response': response[0],
+                    'status': response[1] if len(response) > 1 else None,
+                    'headers': response[2] if len(response) > 2 else None
+                }
+                return APIResponse(**response)
             elif hasattr(response, '__call__'):
                 return response
             else:
@@ -131,7 +143,7 @@ app = APIApp(__name__)
 app.config.from_object('config')
 logging_setup(app.config.get('ENVIRONMENT', 'production'))
 logging.info('loading var from config object:\n%s', dict(app.config))
-app.db = lambda collection: MongoClient(app.config['MONGODB_URI']).suggestic_base[collection]
+app.db = lambda: MongoClient(app.config['MONGODB_URI'])
 
 from blueprints.user import bp as user
 
@@ -141,8 +153,8 @@ app.register_blueprint(user, url_prefix='/' + 'user')
 @app.get('/')
 def index():
     logging.info('Esto es una prueba')
-    1 / 0
-    return 'eder'
+    #1 / 0
+    #return 'eder'
     return ['google', 1, 2]
     return ('Hello world', 500)
     return (None, 404)
