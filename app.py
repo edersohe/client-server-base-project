@@ -1,14 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
-import logging
-
-from pymongo import MongoClient
 from flask import Flask, json, Response, Blueprint
-from werkzeug.exceptions import default_exceptions
-from werkzeug.exceptions import HTTPException
+from werkzeug.exceptions import default_exceptions, HTTPException
 from werkzeug.http import HTTP_STATUS_CODES
 
 
@@ -137,30 +134,3 @@ class APIBlueprint(Blueprint):
 
     def delete(self, rule):
         return self.route(rule, methods=['DELETE'])
-
-
-app = APIApp(__name__)
-app.config.from_object('config')
-logging_setup(app.config.get('ENVIRONMENT', 'production'))
-logging.info('loading var from config object:\n%s', dict(app.config))
-app.db = lambda: MongoClient(app.config['MONGODB_URI'])
-
-from blueprints.user import bp as user
-
-app.register_blueprint(user, url_prefix='/' + 'user')
-
-
-@app.get('/')
-def index():
-    logging.info('Esto es una prueba')
-    #1 / 0
-    #return 'eder'
-    return ['google', 1, 2]
-    return ('Hello world', 500)
-    return (None, 404)
-    print app.db('menu_items_flattened_all_ingredients')
-    return app.send_static_file('templates/index.html')
-
-
-if __name__ == "__main__":
-    app.run(use_reloader=True)
